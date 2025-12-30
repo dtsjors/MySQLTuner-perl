@@ -39,6 +39,13 @@ generate_cve:
 	git add ./vulnerabilities.csv
 	git commit -m "Generate CVE list at $(shell date --iso=seconds)"
 
+docker_generate_cve:
+	docker build -q -f Dockerfile.updatecvelist -t updatecvelist .
+	docker run --rm -v "$$PWD/output:/app/output" updatecvelist
+	mv output/vulnerabilities.csv ./vulnerabilities.csv
+	git add ./vulnerabilities.csv
+	git commit -m "Generate CVE list at $(shell date --iso=seconds)"
+
 generate_version_file:
 	rm -f CURRENT_VERSION.txt
 	grep "# mysqltuner.pl - Version" ./mysqltuner.pl | awk '{ print $$NF}' > CURRENT_VERSION.txt

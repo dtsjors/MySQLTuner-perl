@@ -1,5 +1,6 @@
 *.md
 build/**
+!build/updateCVElist.pl
 Makefile
 .perltidy
 *.json
