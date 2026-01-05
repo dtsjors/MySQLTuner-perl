@@ -82,6 +82,7 @@ open(my $outfh, '>:encoding(UTF-8)', $output_csv) or die "Cannot open $output_cs
 # Recursively process all JSON files, but filter early with grep
 print "[Step 4/4] Collecting CVE JSON files (early filter with grep)...\n";
 my @json_files = `grep -rilE 'mysql|mariadb|percona' $cves_dir`;
+# my @json_files = ('zip/cvelistV5-main/cves/2023/52xxx/CVE-2023-52969.json');
 chomp @json_files;
 my $total = scalar @json_files;
 print "Found $total relevant CVE JSON files to process.\n";
@@ -146,22 +147,22 @@ foreach my $json_file (@json_files) {
     # Version extraction
     my @versions;
     # Try affected array first, but always apply fallback extraction from description
-    my $has_real_version = 0;
     if (ref $data->{containers}->{cna}->{affected} eq 'ARRAY') {
         foreach my $aff (@{ $data->{containers}->{cna}->{affected} }) {
             if ($aff->{versions} && ref $aff->{versions} eq 'ARRAY') {
                 foreach my $ver (@{ $aff->{versions} }) {
-                    if ($ver->{version} && $ver->{version} ne 'n/a' && $ver->{version} ne '*') {
+                    if ($ver->{lessThan}) {
+                        push @versions, apply_before_logic($ver->{lessThan});
+                    } elsif ($ver->{lessThanOrEqual}) {
+                        push @versions, $ver->{lessThanOrEqual};
+                    } elsif ($ver->{version} && $ver->{version} ne 'n/a' && $ver->{version} ne '*') {
                         push @versions, $ver->{version};
-                        $has_real_version = 1;
                     }
-                    # Always push lessThan and lessThanOrEqual if present
-                    push @versions, apply_before_logic($ver->{lessThan}) if $ver->{lessThan};
-                    push @versions, $ver->{lessThanOrEqual} if $ver->{lessThanOrEqual};
                 }
             }
         }
     }
+
     # Only apply fallback: try to extract from description if no versions are defined
     if (!@versions and $desc) {
         # Match digit.digit.digit
@@ -216,6 +217,7 @@ foreach my $json_file (@json_files) {
             # Clean version: replace 'x' with '99', remove 'and earlier', 'andearlier', and 'MySQL Server '
             my $vers_mod = $vers;
             $vers_mod =~ s/\.x$/'.' . MAX_VERSION_PART/e;
+            $vers_mod =~ s/\.\*$/'.' . MAX_VERSION_PART/e;
             $vers_mod =~ s/\s*and earlier//ig;
             $vers_mod =~ s/andearlier//ig;
             $vers_mod =~ s/MySQL Server //ig;
